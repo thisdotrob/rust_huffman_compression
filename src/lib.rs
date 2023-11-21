@@ -237,4 +237,56 @@ mod tests {
 
         assert_eq!(output, vec![0b00000001]);
     }
+
+    #[test]
+    fn it_adds_a_termination_code_if_provided() {
+        let mut values = [0; 256];
+        let mut bit_counts = [0; 256];
+
+        let uncompressed_byte: u8 = 0x92;
+        values[uncompressed_byte as usize] = 0b1010;
+        bit_counts[uncompressed_byte as usize] = 4;
+
+        let terminal_code = TerminalCode {
+            bit_count: 3,
+            value: 0b111,
+        };
+
+        let table = HuffmanTable { values, bit_counts };
+
+        let huffman = Huffman { table, terminal_code: Some(terminal_code) };
+
+        let src = vec![uncompressed_byte];
+        let mut output = Vec::new();
+
+        huffman.compress(src, &mut output);
+
+        assert_eq!(output, vec![0b1010_111_0]);
+    }
+
+    #[test]
+    fn it_adds_a_new_compressed_byte_for_the_termination_code_if_necessary() {
+        let mut values = [0; 256];
+        let mut bit_counts = [0; 256];
+
+        let uncompressed_byte: u8 = 0x92;
+        values[uncompressed_byte as usize] = 0b10000000;
+        bit_counts[uncompressed_byte as usize] = 8;
+
+        let terminal_code = TerminalCode {
+            bit_count: 3,
+            value: 0b101,
+        };
+
+        let table = HuffmanTable { values, bit_counts };
+
+        let huffman = Huffman { table, terminal_code: Some(terminal_code) };
+
+        let src = vec![uncompressed_byte];
+        let mut output = Vec::new();
+
+        huffman.compress(src, &mut output);
+
+        assert_eq!(output, vec![0b10000000, 0b10100000]);
+    }
 }
