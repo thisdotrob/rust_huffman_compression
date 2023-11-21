@@ -8,4 +8,4 @@ I need this for my Rust implementation of an Ultima Online game server but thoug
 - Refactor (incl. tests)
 - Check performance and tweak
 - Add docs
-- Add test for compressing to a value with leading zeroes
+- Add test for adding a termination code

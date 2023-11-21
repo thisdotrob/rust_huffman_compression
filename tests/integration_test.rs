@@ -20,7 +20,7 @@ fn test_example_serv_uo_packet_is_compressed_correctly() {
         value: UO_TERMINAL_CODE_VALUE,
     };
 
-    let huffman = Huffman { table, terminal_code };
+    let huffman = Huffman { table, terminal_code: Some(terminal_code) };
 
     let src = vec![0xB9, 0x00, 0xFF, 0x92, 0xDB];
     let mut output = Vec::new();

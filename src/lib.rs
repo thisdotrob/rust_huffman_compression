@@ -17,11 +17,11 @@ pub struct HuffmanTable {
 
 pub struct Huffman {
     pub table: HuffmanTable,
-    pub terminal_code: TerminalCode,
+    pub terminal_code: Option<TerminalCode>,
 }
 
 impl Huffman {
-    pub fn new(terminal_code: TerminalCode, table: HuffmanTable) -> Huffman {
+    pub fn new(terminal_code: Option<TerminalCode>, table: HuffmanTable) -> Huffman {
         return Huffman { terminal_code, table }
     }
 
@@ -47,7 +47,11 @@ impl Huffman {
 
                 let output_byte = to_write >> to_write_bit_count;
 
-                let mask = u32::MAX >> (32 - to_write_bit_count);
+                let mask = if to_write_bit_count > 0 {
+                    u32::MAX >> (32 - to_write_bit_count) // errors if to_write_bit_count is 0
+                } else {
+                    0
+                };
 
                 to_write = to_write & mask;
 
@@ -55,21 +59,26 @@ impl Huffman {
             }
         }
 
-        let compressed_value = self.terminal_code.value;
+        if let Some(terminal_code) = &self.terminal_code {
+            let compressed_value = terminal_code.value;
 
-        let compressed_value_bit_count = self.terminal_code.bit_count;
+            let compressed_value_bit_count = terminal_code.bit_count;
 
-        to_write = to_write << compressed_value_bit_count;
+            to_write = to_write << compressed_value_bit_count;
 
-        to_write = to_write | compressed_value;
+            to_write = to_write | compressed_value;
 
-        to_write_bit_count = to_write_bit_count + compressed_value_bit_count;
-        
-        let byte_boundary_offset = 8 - (to_write_bit_count % 8);
+            to_write_bit_count = to_write_bit_count + compressed_value_bit_count;
+        }
 
-        to_write = to_write << byte_boundary_offset;
+        let byte_boundary_offset = to_write_bit_count % 8;
 
-        to_write_bit_count = to_write_bit_count + byte_boundary_offset;
+        if byte_boundary_offset != 0 {
+            let padding_bits_needed = 8 - byte_boundary_offset;
+            to_write = to_write << padding_bits_needed;
+
+            to_write_bit_count = to_write_bit_count + padding_bits_needed;
+        }
 
         while to_write_bit_count >= 8 {
             to_write_bit_count = to_write_bit_count - 8;
@@ -103,9 +112,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
         
-        let terminal_code = TerminalCode { bit_count: 0, value: 0x00 };
-
-        let huffman = Huffman { table, terminal_code };
+        let huffman = Huffman { table, terminal_code: None };
 
         let src = vec![uncompressed_byte];
         let mut output = Vec::new();
@@ -127,9 +134,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
         
-        let terminal_code = TerminalCode { bit_count: 0, value: 0x00 };
-
-        let huffman = Huffman { table, terminal_code };
+        let huffman = Huffman { table, terminal_code: None };
 
         let src = vec![uncompressed_byte, uncompressed_byte, uncompressed_byte];
         let mut output = Vec::new();
@@ -151,9 +156,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
         
-        let terminal_code = TerminalCode { bit_count: 0, value: 0x00 };
-
-        let huffman = Huffman { table, terminal_code };
+        let huffman = Huffman { table, terminal_code: None };
 
         let src = vec![uncompressed_byte, uncompressed_byte];
         let mut output = Vec::new();
@@ -182,9 +185,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
         
-        let terminal_code = TerminalCode { bit_count: 0, value: 0x00 };
-
-        let huffman = Huffman { table, terminal_code };
+        let huffman = Huffman { table, terminal_code: None };
 
         huffman.compress(src, &mut output);
 
@@ -206,9 +207,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
         
-        let terminal_code = TerminalCode { bit_count: 0, value: 0x00 };
-
-        let huffman = Huffman { table, terminal_code };
+        let huffman = Huffman { table, terminal_code: None };
 
         let src = vec![uncompressed_byte, uncompressed_byte_2];
         let mut output = Vec::new();
@@ -216,5 +215,26 @@ mod tests {
         huffman.compress(src, &mut output);
 
         assert_eq!(output, vec![0b00111000]);
+    }
+
+    #[test]
+    fn it_compresses_to_values_with_leading_zeroes() {
+        let mut values = [0; 256];
+        let mut bit_counts = [0; 256];
+
+        let uncompressed_byte: u8 = 0x92;
+        values[uncompressed_byte as usize] = 0b1;
+        bit_counts[uncompressed_byte as usize] = 8;
+
+        let table = HuffmanTable { values, bit_counts };
+
+        let huffman = Huffman { table, terminal_code: None };
+
+        let src = vec![uncompressed_byte];
+        let mut output = Vec::new();
+
+        huffman.compress(src, &mut output);
+
+        assert_eq!(output, vec![0b00000001]);
     }
 }
