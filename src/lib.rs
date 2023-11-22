@@ -15,6 +15,16 @@ pub struct HuffmanTable {
     pub bit_counts: [u8; 256],
 }
 
+impl HuffmanTable {
+    fn get_compressed_value(&self, uncompressed_byte: u8) -> u32 {
+        self.values[uncompressed_byte as usize]
+    }
+
+    fn get_compressed_value_bit_count(&self, uncompressed_byte: u8) -> u8 {
+        self.bit_counts[uncompressed_byte as usize]
+    }
+}
+
 struct CompressorBuffer {
     compressed_bits: u32,
     compressed_bit_count: u8,
@@ -73,10 +83,9 @@ impl<'a> Compressor<'a> {
     }
 
     fn compress_byte(&mut self, byte: u8) {
-        let compressed_value = self.table.values[byte as usize];
-        let compressed_value_bit_count = self.table.bit_counts[byte as usize];
-        self.buffer
-            .write_bits(compressed_value, compressed_value_bit_count);
+        let value = self.table.get_compressed_value(byte);
+        let bit_count = self.table.get_compressed_value_bit_count(byte);
+        self.buffer.write_bits(value, bit_count);
     }
 
     fn get_compressed_byte(&mut self) -> Option<u8> {
@@ -84,10 +93,8 @@ impl<'a> Compressor<'a> {
     }
 
     fn append_terminal_code(&mut self, terminal_code: &TerminalCode) {
-        let compressed_value = terminal_code.value;
-        let compressed_value_bit_count = terminal_code.bit_count;
         self.buffer
-            .write_bits(compressed_value, compressed_value_bit_count);
+            .write_bits(terminal_code.value, terminal_code.bit_count);
     }
 
     fn end(&mut self) {
@@ -95,8 +102,8 @@ impl<'a> Compressor<'a> {
 
         if byte_boundary_offset != 0 {
             let padding_value = 0b0;
-            let padding_bits_needed = 8 - byte_boundary_offset;
-            self.buffer.write_bits(padding_value, padding_bits_needed);
+            let padding_bit_count = 8 - byte_boundary_offset;
+            self.buffer.write_bits(padding_value, padding_bit_count);
         }
     }
 }
@@ -126,7 +133,7 @@ impl Huffman {
         let mut compressor = Compressor::new(&self.table);
 
         for byte in src {
-            compressor.compress_byte(byte); // what impact on performance does this casting have?
+            compressor.compress_byte(byte);
 
             for compressed_byte in &mut compressor {
                 output.push(compressed_byte);
