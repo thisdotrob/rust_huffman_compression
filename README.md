@@ -10,3 +10,5 @@ I need this for my Rust implementation of an Ultima Online game server but thoug
 - Check performance and tweak
 - Add docs
 - Provide a streaming interface?
+- Validate the values & bit counts given to HuffmanTable
+- Prevent panics when buffer exceeds 32 bits
