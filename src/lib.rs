@@ -24,25 +24,17 @@ struct Compressor<'a> {
 impl<'a> Compressor<'a> {
     fn compress_byte(&mut self, byte: u8) {
         let compressed_value = self.table.values[byte as usize];
-
         let compressed_value_bit_count = self.table.bit_counts[byte as usize];
-
         self.buffer_write(compressed_value, compressed_value_bit_count);
     }
 
     fn buffer_write(&mut self, value: u32, bit_count: u8) {
         self.compressed_bits = self.compressed_bits << bit_count;
-
         self.compressed_bits = self.compressed_bits | value;
-
         self.compressed_bit_count = self.compressed_bit_count + bit_count;
     }
 
-    fn get_compressed_byte(&mut self) -> Option<u8> {
-        if self.compressed_bit_count < 8 {
-            return None;
-        }
-
+    fn buffer_read_byte(&mut self) -> u8 {
         self.compressed_bit_count = self.compressed_bit_count - 8;
 
         let byte = self.compressed_bits >> self.compressed_bit_count;
@@ -55,30 +47,34 @@ impl<'a> Compressor<'a> {
 
         self.compressed_bits = self.compressed_bits & mask;
 
-        Some(byte as u8) // what impact on performance does this casting have?
+        byte as u8 // what impact on performance does this casting have?
+    }
+
+    fn get_compressed_byte(&mut self) -> Option<u8> {
+        if self.compressed_bit_count < 8 {
+            return None;
+        }
+
+        let byte = self.buffer_read_byte();
+
+        Some(byte)
     }
 
     fn append_terminal_code(&mut self, terminal_code: &TerminalCode) {
         let compressed_value = terminal_code.value;
-
         let compressed_value_bit_count = terminal_code.bit_count;
 
-        self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
-
-        self.compressed_bits = self.compressed_bits | compressed_value;
-
-        self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
+        self.buffer_write(compressed_value, compressed_value_bit_count);
     }
 
     fn end(&mut self) {
         let byte_boundary_offset = self.compressed_bit_count % 8;
 
         if byte_boundary_offset != 0 {
+            let padding_value = 0b0;
             let padding_bits_needed = 8 - byte_boundary_offset;
 
-            self.compressed_bits = self.compressed_bits << padding_bits_needed;
-
-            self.compressed_bit_count = self.compressed_bit_count + padding_bits_needed;
+            self.buffer_write(padding_value, padding_bits_needed);
         }
     }
 }
