@@ -15,26 +15,30 @@ pub struct HuffmanTable {
     pub bit_counts: [u8; 256],
 }
 
-struct Compressor<'a> {
-    table: &'a HuffmanTable,
+struct CompressorBuffer {
     compressed_bits: u32,
     compressed_bit_count: u8,
 }
 
-impl<'a> Compressor<'a> {
-    fn compress_byte(&mut self, byte: u8) {
-        let compressed_value = self.table.values[byte as usize];
-        let compressed_value_bit_count = self.table.bit_counts[byte as usize];
-        self.buffer_write(compressed_value, compressed_value_bit_count);
+impl CompressorBuffer {
+    fn new() -> Self {
+        Self {
+            compressed_bits: 0,
+            compressed_bit_count: 0,
+        }
     }
 
-    fn buffer_write(&mut self, value: u32, bit_count: u8) {
+    fn write_bits(&mut self, value: u32, bit_count: u8) {
         self.compressed_bits = self.compressed_bits << bit_count;
         self.compressed_bits = self.compressed_bits | value;
         self.compressed_bit_count = self.compressed_bit_count + bit_count;
     }
 
-    fn buffer_read_byte(&mut self) -> u8 {
+    fn read_byte(&mut self) -> Option<u8> {
+        if self.compressed_bit_count < 8 {
+            return None;
+        }
+
         self.compressed_bit_count = self.compressed_bit_count - 8;
 
         let byte = self.compressed_bits >> self.compressed_bit_count;
@@ -47,34 +51,52 @@ impl<'a> Compressor<'a> {
 
         self.compressed_bits = self.compressed_bits & mask;
 
-        byte as u8 // what impact on performance does this casting have?
+        Some(byte as u8) // what impact on performance does this casting have?
+    }
+
+    fn byte_boundary_offset(&self) -> u8 {
+        self.compressed_bit_count % 8
+    }
+}
+
+struct Compressor<'a> {
+    table: &'a HuffmanTable,
+    buffer: CompressorBuffer,
+}
+
+impl<'a> Compressor<'a> {
+    fn new(table: &'a HuffmanTable) -> Self {
+        Compressor {
+            table,
+            buffer: CompressorBuffer::new(),
+        }
+    }
+
+    fn compress_byte(&mut self, byte: u8) {
+        let compressed_value = self.table.values[byte as usize];
+        let compressed_value_bit_count = self.table.bit_counts[byte as usize];
+        self.buffer
+            .write_bits(compressed_value, compressed_value_bit_count);
     }
 
     fn get_compressed_byte(&mut self) -> Option<u8> {
-        if self.compressed_bit_count < 8 {
-            return None;
-        }
-
-        let byte = self.buffer_read_byte();
-
-        Some(byte)
+        self.buffer.read_byte()
     }
 
     fn append_terminal_code(&mut self, terminal_code: &TerminalCode) {
         let compressed_value = terminal_code.value;
         let compressed_value_bit_count = terminal_code.bit_count;
-
-        self.buffer_write(compressed_value, compressed_value_bit_count);
+        self.buffer
+            .write_bits(compressed_value, compressed_value_bit_count);
     }
 
     fn end(&mut self) {
-        let byte_boundary_offset = self.compressed_bit_count % 8;
+        let byte_boundary_offset = self.buffer.byte_boundary_offset();
 
         if byte_boundary_offset != 0 {
             let padding_value = 0b0;
             let padding_bits_needed = 8 - byte_boundary_offset;
-
-            self.buffer_write(padding_value, padding_bits_needed);
+            self.buffer.write_bits(padding_value, padding_bits_needed);
         }
     }
 }
@@ -101,11 +123,7 @@ impl Huffman {
     }
 
     pub fn compress(&mut self, src: Vec<u8>, output: &mut Vec<u8>) {
-        let mut compressor = Compressor {
-            table: &self.table,
-            compressed_bits: 0,
-            compressed_bit_count: 0,
-        };
+        let mut compressor = Compressor::new(&self.table);
 
         for byte in src {
             compressor.compress_byte(byte); // what impact on performance does this casting have?
