@@ -19,6 +19,7 @@ pub struct Huffman {
     pub table: HuffmanTable,
     pub terminal_code: Option<TerminalCode>,
     to_write: u32,
+    to_write_bit_count: u8,
 }
 
 impl Huffman {
@@ -27,13 +28,14 @@ impl Huffman {
             terminal_code,
             table,
             to_write: 0,
+            to_write_bit_count: 0,
         };
     }
 
     pub fn compress(&mut self, src: Vec<u8>, output: &mut Vec<u8>) {
         self.to_write = 0;
 
-        let mut to_write_bit_count: u8 = 0;
+        self.to_write_bit_count = 0;
 
         for byte in src {
             // What does casting `byte` to usize as below do performance wise?
@@ -45,15 +47,15 @@ impl Huffman {
 
             self.to_write = self.to_write | compressed_value;
 
-            to_write_bit_count = to_write_bit_count + compressed_value_bit_count;
+            self.to_write_bit_count = self.to_write_bit_count + compressed_value_bit_count;
 
-            while to_write_bit_count >= 8 {
-                to_write_bit_count = to_write_bit_count - 8;
+            while self.to_write_bit_count >= 8 {
+                self.to_write_bit_count = self.to_write_bit_count - 8;
 
-                let output_byte = self.to_write >> to_write_bit_count;
+                let output_byte = self.to_write >> self.to_write_bit_count;
 
-                let mask = if to_write_bit_count > 0 {
-                    u32::MAX >> (32 - to_write_bit_count) // errors if to_write_bit_count is 0
+                let mask = if self.to_write_bit_count > 0 {
+                    u32::MAX >> (32 - self.to_write_bit_count) // errors if to_write_bit_count is 0
                 } else {
                     0
                 };
@@ -73,25 +75,25 @@ impl Huffman {
 
             self.to_write = self.to_write | compressed_value;
 
-            to_write_bit_count = to_write_bit_count + compressed_value_bit_count;
+            self.to_write_bit_count = self.to_write_bit_count + compressed_value_bit_count;
         }
 
-        let byte_boundary_offset = to_write_bit_count % 8;
+        let byte_boundary_offset = self.to_write_bit_count % 8;
 
         if byte_boundary_offset != 0 {
             let padding_bits_needed = 8 - byte_boundary_offset;
             self.to_write = self.to_write << padding_bits_needed;
 
-            to_write_bit_count = to_write_bit_count + padding_bits_needed;
+            self.to_write_bit_count = self.to_write_bit_count + padding_bits_needed;
         }
 
-        while to_write_bit_count >= 8 {
-            to_write_bit_count = to_write_bit_count - 8;
+        while self.to_write_bit_count >= 8 {
+            self.to_write_bit_count = self.to_write_bit_count - 8;
 
-            let output_byte = self.to_write >> to_write_bit_count;
+            let output_byte = self.to_write >> self.to_write_bit_count;
 
-            if to_write_bit_count > 0 {
-                let mask = u32::MAX >> (32 - to_write_bit_count); // errors if to_write_bit_count is 0
+            if self.to_write_bit_count > 0 {
+                let mask = u32::MAX >> (32 - self.to_write_bit_count); // errors if to_write_bit_count is 0
 
                 self.to_write = self.to_write & mask;
             }
