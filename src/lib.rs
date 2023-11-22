@@ -21,8 +21,11 @@ pub struct Huffman {
 }
 
 impl Huffman {
-    pub fn new(terminal_code: Option<TerminalCode>, table: HuffmanTable) -> Huffman {
-        return Huffman { terminal_code, table }
+    pub fn new(table: HuffmanTable, terminal_code: Option<TerminalCode>) -> Huffman {
+        return Huffman {
+            terminal_code,
+            table,
+        };
     }
 
     pub fn compress(&self, src: Vec<u8>, output: &mut Vec<u8>) {
@@ -31,7 +34,7 @@ impl Huffman {
         let mut to_write_bit_count: u8 = 0;
 
         for byte in src {
-             // What does casting `byte` to usize as below do performance wise?
+            // What does casting `byte` to usize as below do performance wise?
             let compressed_value = self.table.values[byte as usize];
 
             let compressed_value_bit_count = self.table.bit_counts[byte as usize];
@@ -111,8 +114,8 @@ mod tests {
         bit_counts[uncompressed_byte as usize] = 1;
 
         let table = HuffmanTable { values, bit_counts };
-        
-        let huffman = Huffman { table, terminal_code: None };
+
+        let huffman = Huffman::new(table, None);
 
         let src = vec![uncompressed_byte];
         let mut output = Vec::new();
@@ -133,8 +136,8 @@ mod tests {
         bit_counts[uncompressed_byte as usize] = 1;
 
         let table = HuffmanTable { values, bit_counts };
-        
-        let huffman = Huffman { table, terminal_code: None };
+
+        let huffman = Huffman::new(table, None);
 
         let src = vec![uncompressed_byte, uncompressed_byte, uncompressed_byte];
         let mut output = Vec::new();
@@ -155,8 +158,8 @@ mod tests {
         bit_counts[uncompressed_byte as usize] = 5;
 
         let table = HuffmanTable { values, bit_counts };
-        
-        let huffman = Huffman { table, terminal_code: None };
+
+        let huffman = Huffman::new(table, None);
 
         let src = vec![uncompressed_byte, uncompressed_byte];
         let mut output = Vec::new();
@@ -184,8 +187,8 @@ mod tests {
         bit_counts[0xB3] = 2;
 
         let table = HuffmanTable { values, bit_counts };
-        
-        let huffman = Huffman { table, terminal_code: None };
+
+        let huffman = Huffman::new(table, None);
 
         huffman.compress(src, &mut output);
 
@@ -206,8 +209,8 @@ mod tests {
         bit_counts[uncompressed_byte_2 as usize] = 3;
 
         let table = HuffmanTable { values, bit_counts };
-        
-        let huffman = Huffman { table, terminal_code: None };
+
+        let huffman = Huffman::new(table, None);
 
         let src = vec![uncompressed_byte, uncompressed_byte_2];
         let mut output = Vec::new();
@@ -228,7 +231,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
 
-        let huffman = Huffman { table, terminal_code: None };
+        let huffman = Huffman::new(table, None);
 
         let src = vec![uncompressed_byte];
         let mut output = Vec::new();
@@ -254,7 +257,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
 
-        let huffman = Huffman { table, terminal_code: Some(terminal_code) };
+        let huffman = Huffman::new(table, Some(terminal_code));
 
         let src = vec![uncompressed_byte];
         let mut output = Vec::new();
@@ -280,7 +283,7 @@ mod tests {
 
         let table = HuffmanTable { values, bit_counts };
 
-        let huffman = Huffman { table, terminal_code: Some(terminal_code) };
+        let huffman = Huffman::new(table, Some(terminal_code));
 
         let src = vec![uncompressed_byte];
         let mut output = Vec::new();
