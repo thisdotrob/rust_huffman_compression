@@ -15,11 +15,77 @@ pub struct HuffmanTable {
     pub bit_counts: [u8; 256],
 }
 
+struct Compressor<'a> {
+    table: &'a HuffmanTable,
+    compressed_bits: u32,
+    compressed_bit_count: u8,
+}
+
+impl<'a> Compressor<'a> {
+    fn compress_byte(&mut self, byte: u8) {
+        let compressed_value = self.table.values[byte as usize];
+
+        let compressed_value_bit_count = self.table.bit_counts[byte as usize];
+
+        self.buffer_write(compressed_value, compressed_value_bit_count);
+    }
+
+    fn buffer_write(&mut self, value: u32, bit_count: u8) {
+        self.compressed_bits = self.compressed_bits << bit_count;
+
+        self.compressed_bits = self.compressed_bits | value;
+
+        self.compressed_bit_count = self.compressed_bit_count + bit_count;
+    }
+
+    fn get_compressed_byte(&mut self) -> Option<u8> {
+        if self.compressed_bit_count < 8 {
+            return None
+        }
+
+        self.compressed_bit_count = self.compressed_bit_count - 8;
+
+        let byte = self.compressed_bits >> self.compressed_bit_count;
+
+        let mask = if self.compressed_bit_count > 0 {
+            u32::MAX >> (32 - self.compressed_bit_count)
+        } else {
+            0
+        };
+
+        self.compressed_bits = self.compressed_bits & mask;
+
+        Some(byte as u8) // what impact on performance does this casting have?
+    }
+
+    fn append_terminal_code(&mut self, terminal_code: &TerminalCode) {
+        let compressed_value = terminal_code.value;
+
+        let compressed_value_bit_count = terminal_code.bit_count;
+
+        self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
+
+        self.compressed_bits = self.compressed_bits | compressed_value;
+
+        self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
+    }
+
+    fn end(&mut self) {
+        let byte_boundary_offset = self.compressed_bit_count % 8;
+
+        if byte_boundary_offset != 0 {
+            let padding_bits_needed = 8 - byte_boundary_offset;
+
+            self.compressed_bits = self.compressed_bits << padding_bits_needed;
+
+            self.compressed_bit_count = self.compressed_bit_count + padding_bits_needed;
+        }
+    }
+}
+
 pub struct Huffman {
     pub table: HuffmanTable,
     pub terminal_code: Option<TerminalCode>,
-    compressed_bits: u32,
-    compressed_bit_count: u8,
 }
 
 impl Huffman {
@@ -27,78 +93,32 @@ impl Huffman {
         return Huffman {
             terminal_code,
             table,
-            compressed_bits: 0,
-            compressed_bit_count: 0,
         };
     }
 
     pub fn compress(&mut self, src: Vec<u8>, output: &mut Vec<u8>) {
-        self.compressed_bits = 0;
-
-        self.compressed_bit_count = 0;
+        let mut compressor = Compressor {
+            table: &self.table,
+            compressed_bits: 0,
+            compressed_bit_count: 0,
+        };
 
         for byte in src {
-            // What does casting `byte` to usize as below do performance wise?
-            let compressed_value = self.table.values[byte as usize];
+            compressor.compress_byte(byte); // what impact on performance does this casting have?
 
-            let compressed_value_bit_count = self.table.bit_counts[byte as usize];
-
-            self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
-
-            self.compressed_bits = self.compressed_bits | compressed_value;
-
-            self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
-
-            while self.compressed_bit_count >= 8 {
-                self.compressed_bit_count = self.compressed_bit_count - 8;
-
-                let output_byte = self.compressed_bits >> self.compressed_bit_count;
-
-                let mask = if self.compressed_bit_count > 0 {
-                    u32::MAX >> (32 - self.compressed_bit_count) // errors if compressed_bit_count is 0
-                } else {
-                    0
-                };
-
-                self.compressed_bits = self.compressed_bits & mask;
-
-                output.push(output_byte as u8);
+            while let Some(output_byte) = compressor.get_compressed_byte() {
+                output.push(output_byte);
             }
         }
 
         if let Some(terminal_code) = &self.terminal_code {
-            let compressed_value = terminal_code.value;
-
-            let compressed_value_bit_count = terminal_code.bit_count;
-
-            self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
-
-            self.compressed_bits = self.compressed_bits | compressed_value;
-
-            self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
+            compressor.append_terminal_code(terminal_code);
         }
 
-        let byte_boundary_offset = self.compressed_bit_count % 8;
+        compressor.end();
 
-        if byte_boundary_offset != 0 {
-            let padding_bits_needed = 8 - byte_boundary_offset;
-            self.compressed_bits = self.compressed_bits << padding_bits_needed;
-
-            self.compressed_bit_count = self.compressed_bit_count + padding_bits_needed;
-        }
-
-        while self.compressed_bit_count >= 8 {
-            self.compressed_bit_count = self.compressed_bit_count - 8;
-
-            let output_byte = self.compressed_bits >> self.compressed_bit_count;
-
-            if self.compressed_bit_count > 0 {
-                let mask = u32::MAX >> (32 - self.compressed_bit_count); // errors if compressed_bit_count is 0
-
-                self.compressed_bits = self.compressed_bits & mask;
-            }
-
-            output.push(output_byte as u8);
+        while let Some(output_byte) = compressor.get_compressed_byte() {
+            output.push(output_byte);
         }
     }
 }
