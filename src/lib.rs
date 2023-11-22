@@ -18,8 +18,8 @@ pub struct HuffmanTable {
 pub struct Huffman {
     pub table: HuffmanTable,
     pub terminal_code: Option<TerminalCode>,
-    to_write: u32,
-    to_write_bit_count: u8,
+    compressed_bits: u32,
+    compressed_bit_count: u8,
 }
 
 impl Huffman {
@@ -27,15 +27,15 @@ impl Huffman {
         return Huffman {
             terminal_code,
             table,
-            to_write: 0,
-            to_write_bit_count: 0,
+            compressed_bits: 0,
+            compressed_bit_count: 0,
         };
     }
 
     pub fn compress(&mut self, src: Vec<u8>, output: &mut Vec<u8>) {
-        self.to_write = 0;
+        self.compressed_bits = 0;
 
-        self.to_write_bit_count = 0;
+        self.compressed_bit_count = 0;
 
         for byte in src {
             // What does casting `byte` to usize as below do performance wise?
@@ -43,24 +43,24 @@ impl Huffman {
 
             let compressed_value_bit_count = self.table.bit_counts[byte as usize];
 
-            self.to_write = self.to_write << compressed_value_bit_count;
+            self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
 
-            self.to_write = self.to_write | compressed_value;
+            self.compressed_bits = self.compressed_bits | compressed_value;
 
-            self.to_write_bit_count = self.to_write_bit_count + compressed_value_bit_count;
+            self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
 
-            while self.to_write_bit_count >= 8 {
-                self.to_write_bit_count = self.to_write_bit_count - 8;
+            while self.compressed_bit_count >= 8 {
+                self.compressed_bit_count = self.compressed_bit_count - 8;
 
-                let output_byte = self.to_write >> self.to_write_bit_count;
+                let output_byte = self.compressed_bits >> self.compressed_bit_count;
 
-                let mask = if self.to_write_bit_count > 0 {
-                    u32::MAX >> (32 - self.to_write_bit_count) // errors if to_write_bit_count is 0
+                let mask = if self.compressed_bit_count > 0 {
+                    u32::MAX >> (32 - self.compressed_bit_count) // errors if compressed_bit_count is 0
                 } else {
                     0
                 };
 
-                self.to_write = self.to_write & mask;
+                self.compressed_bits = self.compressed_bits & mask;
 
                 output.push(output_byte as u8);
             }
@@ -71,31 +71,31 @@ impl Huffman {
 
             let compressed_value_bit_count = terminal_code.bit_count;
 
-            self.to_write = self.to_write << compressed_value_bit_count;
+            self.compressed_bits = self.compressed_bits << compressed_value_bit_count;
 
-            self.to_write = self.to_write | compressed_value;
+            self.compressed_bits = self.compressed_bits | compressed_value;
 
-            self.to_write_bit_count = self.to_write_bit_count + compressed_value_bit_count;
+            self.compressed_bit_count = self.compressed_bit_count + compressed_value_bit_count;
         }
 
-        let byte_boundary_offset = self.to_write_bit_count % 8;
+        let byte_boundary_offset = self.compressed_bit_count % 8;
 
         if byte_boundary_offset != 0 {
             let padding_bits_needed = 8 - byte_boundary_offset;
-            self.to_write = self.to_write << padding_bits_needed;
+            self.compressed_bits = self.compressed_bits << padding_bits_needed;
 
-            self.to_write_bit_count = self.to_write_bit_count + padding_bits_needed;
+            self.compressed_bit_count = self.compressed_bit_count + padding_bits_needed;
         }
 
-        while self.to_write_bit_count >= 8 {
-            self.to_write_bit_count = self.to_write_bit_count - 8;
+        while self.compressed_bit_count >= 8 {
+            self.compressed_bit_count = self.compressed_bit_count - 8;
 
-            let output_byte = self.to_write >> self.to_write_bit_count;
+            let output_byte = self.compressed_bits >> self.compressed_bit_count;
 
-            if self.to_write_bit_count > 0 {
-                let mask = u32::MAX >> (32 - self.to_write_bit_count); // errors if to_write_bit_count is 0
+            if self.compressed_bit_count > 0 {
+                let mask = u32::MAX >> (32 - self.compressed_bit_count); // errors if compressed_bit_count is 0
 
-                self.to_write = self.to_write & mask;
+                self.compressed_bits = self.compressed_bits & mask;
             }
 
             output.push(output_byte as u8);
