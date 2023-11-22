@@ -40,7 +40,7 @@ impl<'a> Compressor<'a> {
 
     fn get_compressed_byte(&mut self) -> Option<u8> {
         if self.compressed_bit_count < 8 {
-            return None
+            return None;
         }
 
         self.compressed_bit_count = self.compressed_bit_count - 8;
