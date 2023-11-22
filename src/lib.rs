@@ -79,6 +79,14 @@ impl<'a> Compressor<'a> {
     }
 }
 
+impl<'a> Iterator for Compressor<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<u8> {
+        self.get_compressed_byte()
+    }
+}
+
 pub struct Huffman {
     pub table: HuffmanTable,
     pub terminal_code: Option<TerminalCode>,
@@ -102,8 +110,8 @@ impl Huffman {
         for byte in src {
             compressor.compress_byte(byte); // what impact on performance does this casting have?
 
-            while let Some(output_byte) = compressor.get_compressed_byte() {
-                output.push(output_byte);
+            for compressed_byte in &mut compressor {
+                output.push(compressed_byte);
             }
         }
 
@@ -113,8 +121,8 @@ impl Huffman {
 
         compressor.end();
 
-        while let Some(output_byte) = compressor.get_compressed_byte() {
-            output.push(output_byte);
+        for compressed_byte in &mut compressor {
+            output.push(compressed_byte);
         }
     }
 }
