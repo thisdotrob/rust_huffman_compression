@@ -152,10 +152,10 @@ assert_eq!(output, vec![0b1111_0111, 0b1011_001_0]);
 
 ## To do
 - Refactor tests
-- Add tests for extracted modules
 - Check performance and tweak
 - Add docs
 - Provide a streaming interface?
 - Validate the values & bit counts given to HuffmanTable
 - Validate the termination code is not present in the table
-- Prevent panics when buffer exceeds 32 bits
+- Combine `values` and `bit_counts` arrays into single array?
+- Prevent panics when buffer exceeds 32 bits?
