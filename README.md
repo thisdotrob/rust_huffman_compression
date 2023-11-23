@@ -57,6 +57,99 @@ To decompress, the receiving code needs to traverse a pre constructed tree built
 
 Starting from the top, the code should take each of the compressed bits one by one and go left (0) or right (1) depending on its value. In the compressed packet from the example above the first bit is 1, so the code should go *right*. The next 4 bits are also 1s, so the code would continue branching right until it reached the leaf node of `0x01`, the original uncompressed byte that corresponds to these first five 1 bits. It would then write this decompressed byte and carry on to the next bit, starting from the top of the tree again.
 
+## How to use this crate
+
+### Getting started
+
+First construct a `HuffmanTable` which represents the encoding rules:
+
+```rust
+let values: [u32; 256] = [
+    0b1111, 0b0111, 0b1011, 0b110,
+    // snip
+];
+
+let bit_counts: [u8; 256] = [
+    4, 4, 4, 4,
+    // snip
+];
+
+let table = HuffmanTable { values, bit_counts };
+```
+
+`values` are the compressed bits that should be written for corresponding uncompressed bytes. `bit_counts` are the number of bits that should be written for each encoded value. The correct value and bit_count for each uncompressed byte are looked up by using that byte as an index to look up the elements in the two arrays.
+
+For example, given an uncompressed byte of 0x03:
+  - The value, `0b110`, lies at index 3 (i.e. `0x03`) of `values`
+  - The bit count, `4`,  lies at index 3 (again, `0x03`) of `bit_counts`
+  - The final compressed bits are the value after is has been left padded with 0s until the bit_count is reached. In this case that means `0110` is written.
+
+The example above shows only the first 4 elements for each array but in reality you will need to populate all 256.
+
+Next create a `Huffman`, passing it the table:
+
+```rust
+let mut huffman = Huffman::new(table, None); // <-- the None is for the termination code, see further down
+```
+
+Now, send bytes to be compressed and an output vec for the compressed bits to be pushed to:
+
+```rust
+let uncompressed_bytes = vec![0x00, 0x01, 0x02, 0x03];
+
+let mut output = Vec::new();
+
+huffman.compress(uncompressed_bytes, &mut output);
+```
+
+Now we can see that `output` has been populated with the compressed bits, separated into bytes: 
+
+```rust
+// as binary with underscores separating the original compressed bit groupings:
+assert_eq!(output, vec![0b1111_0111, 0b1011_0110]);
+
+// or as hex:
+assert_eq!(output, vec![0xF7, 0xB6]);
+```
+
+### Byte boundaries and termination codes
+
+If the compressed bits do not align with a byte boundary like they do in the example above, the crate will pad with zeroes:
+
+```rust
+// using the same table as in the previous example
+
+let uncompressed_bytes = [0x00, 0x01, 0x02];
+
+huffman.compress(uncompressed_bytes, &mut output);
+
+// the compressed bits will now be 0b1111_0111_1011. This is only one and a half bytes, so
+// four zeroes are added to the end to make up to the next byte boundary:
+assert_eq!(output, vec![0b1111_0111, 0b1011_0000]);
+```
+
+This is fine so long as the zeroes added for padding do not clash with one of the compressed values for a byte. For example if a 0x04 byte had a compressed value of `0b00` and bit count of 2, the last four bits in the example above would decompress to two 0x04 bytes which is not what we want.
+
+To avoid this, it is possible to append a termination code to the compressed bits which will signal to the consuming code that any bits following do not represent compressed bytes and should be ignored:
+
+```rust
+// this time, set up the Huffman with a TerminalCode:
+
+let terminal_code = TerminalCode { value: 0b001, bit_count: 3 };
+let huffman = Huffman::new(table, Some(terminal_code));
+
+// compress as normal:
+
+let uncompressed_bytes = [0x00, 0x01, 0x02];
+huffman.compress(uncompressed_bytes, &mut output);
+
+// now the termination code is appended to the output before padding with zeroes:
+
+assert_eq!(output, vec![0b1111_0111, 0b1011_001_0]);
+//                                           ^
+//                                  termination code
+```
+
 ## To do
 - Refactor tests
 - Add tests for extracted modules
@@ -64,4 +157,5 @@ Starting from the top, the code should take each of the compressed bits one by o
 - Add docs
 - Provide a streaming interface?
 - Validate the values & bit counts given to HuffmanTable
+- Validate the termination code is not present in the table
 - Prevent panics when buffer exceeds 32 bits
