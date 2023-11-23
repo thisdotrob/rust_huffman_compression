@@ -57,7 +57,10 @@ mod tests {
 
     #[test]
     fn it_returns_none_when_compress_byte_has_not_been_called() {
-        let table = HuffmanTable { values: [0; 256], bit_counts: [1; 256] };
+        let table = HuffmanTable {
+            values: [0; 256],
+            bit_counts: [1; 256],
+        };
 
         let mut compressor = Compressor::new(&table);
 

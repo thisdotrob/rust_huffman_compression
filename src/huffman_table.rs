@@ -32,10 +32,7 @@ mod tests {
         values[0x33] = 0xFFF;
         bit_counts[0x33] = 12;
 
-        let huffman_table = HuffmanTable {
-            values,
-            bit_counts,
-        };
+        let huffman_table = HuffmanTable { values, bit_counts };
 
         let compressed_value = huffman_table.get_compressed_value(0x33);
         assert_eq!(compressed_value, 0xFFF);
@@ -49,13 +46,9 @@ mod tests {
         values[0x33] = 0xFFF;
         bit_counts[0x33] = 12;
 
-        let huffman_table = HuffmanTable {
-            values,
-            bit_counts,
-        };
+        let huffman_table = HuffmanTable { values, bit_counts };
 
         let compressed_value = huffman_table.get_compressed_value_bit_count(0x33);
         assert_eq!(compressed_value, 12);
     }
-
 }
